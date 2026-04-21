@@ -1,0 +1,3 @@
+Tipps Georg
+- Bessere Train Test splits: in train und test: bilder welche weiter weg sind und näher sind. 
+- Stick to KNN_Pipeline_GridSearch
