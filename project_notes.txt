@@ -1,3 +1,14 @@
-Tipps Georg
-- Bessere Train Test splits: in train und test: bilder welche weiter weg sind und näher sind. 
-- Stick to KNN_Pipeline_GridSearch
+Interpreting Distance Labels plot:
+- The plot is multimodal --> has a hump at 1.6 meters and a second one at 2.3 meters
+- It has a long tail the the left
+
+Interpretation of Pixel intensity vs Distance
+- all plots (all colors and also over avg) have a strong concentration of intensity values at more less 1.75 meters
+
+Further models to try
+- Robust Linear Models (TheilSen)
+- Random Forest Regressor
+
+Interpretation of the data
+
+--> do ensemble with one predicting distant labels and one close labels

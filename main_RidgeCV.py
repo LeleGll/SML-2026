@@ -8,9 +8,10 @@ from sklearn import datasets, svm, preprocessing, linear_model
 from sklearn.linear_model import LinearRegression, Ridge, RidgeCV
 import numpy as np
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GridSearchCV
 from sklearn.decomposition import PCA
 from sklearn.metrics import mean_absolute_error
+from PIL import Image
 
 file_path = "C:/Users/guido/SML Projekte 2026/Projekt 1/data/train_labels.csv"
 
@@ -32,77 +33,86 @@ if __name__ == "__main__":
     # setting up alphas
     alphas = np.logspace(-3, 3, 10)
 
-    # # Convert distances into categories
-    # distances_binned = pd.cut(distances, bins=10, labels=False)
+    # Convert distances into categories
+    distances_bins = np.digitize(distances, bins=[1.2, 1.5, 1.7, 1.9, 2.2])
+    labels_df = pd.read_csv(config["data_dir"] / "train_labels.csv", dtype={"ID": str})
+    ids = labels_df["ID"].values
 
     # normal Train Test Split on 20% of Data
-    X_train, X_test, y_train, y_test = train_test_split(images, distances, test_size=0.2, random_state=42)
-
-    # # set up linear Regression
-    # reg = linear_model.LinearRegression()
-
-    # # set up pipeline SVC
-    # clf = make_pipeline(preprocessing.StandardScaler(), 
-    #                     PCA(n_components=0.95), 
-    #                     svm.SVC(kernel='rbf', C=10))
+    X_train, X_test, y_train, y_test, id_train, id_test = train_test_split(
+        images, 
+        distances,
+        ids, 
+        test_size=0.2, 
+        random_state=42,
+        stratify=distances_bins)
     
-    # set up pipeline linear Regression
-    reg_clf = make_pipeline(
-                        preprocessing.StandardScaler(), 
-                        PCA(n_components=100), 
-                        RidgeCV(alphas=alphas, scoring='neg_mean_squared_error'))
-
-    # # Stratified K-Fold Cross Validation on rest of the data
-    # kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    # cv_scores = cross_val_score(reg_clf, X_train, y_train, cv=kf, scoring='r2')
-    # print(f"Model Quality (R2 Score): {cv_scores.mean():.2f}")
-
-    # Train the model
     y_train_log = np.log1p(y_train)
-    reg_clf.fit(X_train, y_train_log)
 
-    # predict
-    log_preds = reg_clf.predict(X_test)
+    Ridge_pipeline = make_pipeline(
+                        preprocessing.StandardScaler(), 
+                        PCA(n_components=200), 
+                        Ridge(alpha=1438.44988828766)
+                    )
+    # param_grid = {
+    # "pca__n_components": [50, 80, 100, 120, 150, 200],
+    # "ridge__alpha": np.logspace(-4, 4, 20)
+    # }
 
-    # Predict and Evaluate
-    final_predictions = np.expm1(log_preds)
-    mae = mean_absolute_error(y_test, final_predictions)
-    print(f"Mean Absolute Error: {mae:.4f} meters")
-
-    # # Normalization of data
-    # scaler = preprocessing.StandardScaler().fit(X_train)
-    # # print(scaler.mean_)
-
-    # # scale data
-    # X_scaled = scaler.transform(X_train)
-
-    # Cross Validation on Training set
-
-    # for train, test in skf.split(X,y):
-    #     print('train - {}   |   test - {}'.format(
-    #         np.bincount(y[train]), np.bincount(y[test])))
+    # ridge_search = GridSearchCV(
+    #     Ridge_pipeline,
+    #     param_grid,
+    #     cv=5,
+    #     scoring="neg_mean_absolute_error",
+    #     n_jobs=-1
+    #     )
     
+    Ridge_pipeline.fit(X_train, y_train_log)
+    # print("Best params:", ridge_search.best_params_)
+    # print("Best CV MAE:", -ridge_search.best_score_)
+
+    ridge_pred_log = Ridge_pipeline.predict(X_test)
+    y_pred = np.expm1(ridge_pred_log)
+
+    mae = mean_absolute_error(y_test, y_pred)
+    print(f"Ridge MAE: {mae:.4f} meters")
+
+    # 🔍 Error analysis by distance bins
+    errors = np.abs(y_pred - y_test)
+
+    bins = [0, 1.2, 1.5, 1.8, 2.2, 10]
+    names = ["very close", "close", "middle", "far", "very far"]
+
     
-    # clf = svm.SVC(kernel='linear', C=1).fit(X_train, y_train)
-    # print(clf.score(X_test, y_test))
 
-    # loading and plotting distance labels
-    # df = pd.read_csv(file_path)
-    # print(df.to_string())
+    for low, high, name in zip(bins[:-1], bins[1:], names):
+        mask = (y_test >= low) & (y_test < high)
+    
+        if mask.sum() > 0:  # avoid empty bins
+            print(f"{name}: count={mask.sum()}, MAE={errors[mask].mean():.4f}")
 
-    # plotting data
-    # plt.figure(figsize=(10,6))
-    # plt.hist(df['distance'], bins=30, edgecolor='black')
-    # plt.title('Distribution of Distance Labels')
-    # plt.xlabel('Distrance Value')
-    # plt.ylabel('Number of Samples (Frequency)')
+    worst_idx = np.argsort(errors)[-10:]
 
-    # plt.show()
+    print("\nWorst predictions:")
+    for i in worst_idx:
+        print(f"Idx {i}: Pred={y_pred[i]:.3f}, True={y_test[i]:.3f}, Error={errors[i]:.3f}")
 
-    # possible preprocessing steps ... training the model
+    for i in worst_idx:
+        print(f"ID {id_test[i]}: Pred={y_pred[i]:.3f}, True={y_test[i]:.3f}")
 
-    # Evaluation
-    # print_results(gt, pred)
+    # Plotting errors
+    img_id = id_test[i]
+    img_path = config["data_dir"] / "train_images" / f"{img_id}.png"
 
-    # Save the results
-    # save_results(test_pred)
+    for i in worst_idx:
+        img_id = id_test[i]
+        img_path = config["data_dir"] / "train_images" / f"{img_id}.png"
+
+        img = Image.open(img_path)
+
+        plt.imshow(img, cmap="gray")
+        plt.title(f"ID={img_id}, Pred={y_pred[i]:.2f}, True={y_test[i]:.2f}")
+        plt.axis("off")
+        plt.show()
+
+    

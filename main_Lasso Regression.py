@@ -51,7 +51,7 @@ if __name__ == "__main__":
                         Lasso(alpha=.000001))
 
     # Stratified K-Fold Cross Validation on rest of the data
-    skf = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     cv_scores = cross_val_score(reg_clf, X_train, y_train, cv=skf, scoring='r2')
     print(f"Model Quality (R2 Score): {cv_scores.mean():.2f}")
 

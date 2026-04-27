@@ -32,8 +32,14 @@ if __name__ == "__main__":
     # flatten images
     images = images.reshape(len(images), -1)
 
-    # normal Train Test Split on 20% of Data
-    X_train, X_test, y_train, y_test = train_test_split(images, distances, test_size=0.2, random_state=42)
+    distance_bins = np.digitize(distances, bins=[1.2, 1.5, 1.7, 1.9, 2.2])
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        images, distances,
+        test_size=0.2,
+        random_state=42,
+        stratify=distance_bins
+    )
 
     # Log transform distance labels
     y_train_log = np.log1p(y_train)
@@ -42,31 +48,44 @@ if __name__ == "__main__":
     # Initializing Pipeline SGD
     rf_pipeline = make_pipeline(
                         RobustScaler(),
-                        PCA(n_components=100),
-                        RandomForestRegressor(random_state=42, n_jobs=-1)
+                        PCA(n_components=50),
+                        RandomForestRegressor(
+                            max_depth=None, 
+                            max_features='sqrt',
+                            min_samples_leaf='1',
+                            min_samples_split=2,
+                            n_estimators=200
+                        )
                         )
     
     # set up grid search
-    rf_param_grid = {
-    'pca__n_components': [50, 80, 100], # More detail
-    'randomforestregressor__n_estimators': [300, 500], # More stability
-    'randomforestregressor__max_features': ['sqrt', 'log2'], # Critical for RF performance
-    'randomforestregressor__min_samples_leaf': [1, 2], # Precise predictions
-    'randomforestregressor__bootstrap': [True]
-    }
+    # rf_param_grid = {
+    #     "randomforestregressor__n_estimators": [100, 200],
+    #     "randomforestregressor__max_depth": [10, 20, None],
+    #     "randomforestregressor__min_samples_split": [2, 5],
+    #     "randomforestregressor__min_samples_leaf": [1, 2],
+    #     "randomforestregressor__max_features": ["sqrt"],
+    #     'pca__n_components': [50, 80, 100], # More detail
+    # # 'randomforestregressor__n_estimators': [300, 500], # More stability
+    # # 'randomforestregressor__max_features': ['sqrt', 'log2'], # Critical for RF performance
+    # # 'randomforestregressor__min_samples_leaf': [1, 2], # Precise predictions
+    # # 'randomforestregressor__bootstrap': [True]
+    # }
 
 
-    # Fit and Predict
-    grid_search = GridSearchCV(
-        rf_pipeline, 
-        rf_param_grid,
-        cv=5,
-        scoring='neg_mean_absolute_error',
-        n_jobs=-1,
-        verbose=1
-        )
+    # # Fit and Predict
+    # grid_search = GridSearchCV(
+    #     rf_pipeline, 
+    #     rf_param_grid,
+    #     cv=5,
+    #     scoring='neg_mean_absolute_error',
+    #     n_jobs=-1,
+    #     verbose=1
+    #     )
     
-    grid_search.fit(X_train, y_train_log)
+    rf_pipeline.fit(X_train, y_train_log)
+    # print("Best params:", grid_search.best_params_)
+    # print("Best CV MAE:", -grid_search.best_score_)
 
     # Use the best model
     best_model = grid_search.best_estimator_
